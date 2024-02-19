@@ -28,7 +28,7 @@ Repo do zan -> [rinha backend 2ª edição](https://github.com/zanfranceschi/rin
 
 * Golang (v1.22)
 * PostgreSQL
-* NGINX
+* Nginx
 
 ## Usage
 
