@@ -1,6 +1,6 @@
 # Rinha Backend v2
 
-Vale ressaltar que esse código serve apenas para os objetivos da rinha... Portanto, nenhum padrão foi aplicado. Foi criado puramente por diversão. ·-·
+Vale ressaltar que esse código serve apenas para os objetivos da rinha... Então, nenhum padrão foi aplicado. Foi criado puramente por diversão. ·-·
 Repo do zan -> [rinha backend 2ª edição](https://github.com/zanfranceschi/rinha-de-backend-2024-q1).
 
 ```
