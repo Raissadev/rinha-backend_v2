@@ -58,7 +58,7 @@ $ curl -v http://localhost:9999
 ```
 
 ## Stress-test
-Obs: You can see the preview in result (run on my machine) ·-·
+Obs: You can see the preview in ./result (run on my machine) ·-·
 ```zsh
 $ make stress 
 # Maybe this command doesn't work for you
