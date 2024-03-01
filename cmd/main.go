@@ -7,6 +7,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -62,29 +63,28 @@ func (ds *DataSource) Handshake() string {
 	return handshake
 }
 
-func (ds *DataSource) Pooling() (err error) {
-	db, err := sqlx.Connect(ds.Driver, ds.Dns)
-	if err != nil {
+func (ds *DataSource) Pooling(conn chan error) {
+	for {
+		db, err := sqlx.Open(ds.Driver, ds.Dns)
+		if err != nil {
+			conn <- err
+			time.Sleep(2 * time.Millisecond)
+			continue
+		}
+
+		db.SetMaxOpenConns(ds.MaxPool)
+		db.SetMaxIdleConns(ds.MaxIdleConns)
+		db.SetConnMaxLifetime(time.Minute * 3)
+
+		ds.DB = db
+		conn <- nil
 		return
 	}
-
-	db.SetMaxOpenConns(ds.MaxPool)
-	db.SetMaxIdleConns(ds.MaxIdleConns)
-	db.SetConnMaxLifetime(time.Minute * 3)
-
-	ds.DB = db
-	return
 }
 
 func (ds *DataSource) Conn() (*sqlx.DB, error) {
 	if ds.DB == nil {
-		if err := ds.Pooling(); err != nil {
-			time.Sleep(4 * time.Second)
-			if err = ds.Pooling(); err != nil {
-				return nil, err
-			}
-			return nil, err
-		}
+		return nil, errors.New("")
 	}
 	return ds.DB, nil
 }
@@ -139,7 +139,7 @@ func (app *Routes) Routing() *Routes {
 			return ctx.SendStatus(http.StatusInternalServerError)
 		}
 
-		tx, err := db.Beginx()
+		tx, err := db.Begin()
 		if err != nil {
 			return ctx.SendStatus(http.StatusInternalServerError)
 		}
@@ -169,7 +169,7 @@ func (app *Routes) Routing() *Routes {
 				,	c.limite
 			`
 		}
-		err = tx.QueryRowx(query, id, req.Value).Scan(&row.ID, &row.Balance, &row.Lmt)
+		err = tx.QueryRow(query, id, req.Value).Scan(&row.ID, &row.Balance, &row.Lmt)
 		if req.Type == "d" && row.Balance < -row.Lmt {
 			tx.Rollback()
 			return ctx.SendStatus(http.StatusUnprocessableEntity)
@@ -188,10 +188,11 @@ func (app *Routes) Routing() *Routes {
 		query = `
 			INSERT INTO transacoes (id_cliente, valor, tipo, descricao) VALUES ($1, $2, $3, $4);
 		`
-		if _, err = tx.Exec(query, row.ID, req.Value, req.Type, req.Desc); err != nil {
-			tx.Rollback()
-			return ctx.SendStatus(http.StatusUnprocessableEntity)
-		}
+		tx.Exec(query, row.ID, req.Value, req.Type, req.Desc)
+		// if _, err = tx.Exec(query, row.ID, req.Value, req.Type, req.Desc); err != nil {
+		// 	tx.Rollback()
+		// 	return ctx.SendStatus(http.StatusUnprocessableEntity)
+		// }
 
 		tx.Commit()
 		return ctx.Status(http.StatusOK).JSON(row)
@@ -277,6 +278,14 @@ func main() {
 	}()
 
 	r := app.Routing()
+
+	conn := make(chan error)
+	go ds.Pooling(conn)
+
+	err := <-conn
+	if err != nil {
+		panic(err)
+	}
 
 	socketPath := os.Getenv("UNIX_SOCK_PATH")
 	os.Remove(socketPath)
